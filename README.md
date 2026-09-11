@@ -14,13 +14,14 @@ Given a single customer message, the pipeline **classifies intent** into a fixed
 
 - [How it works](#how-it-works)
 - [Key results](#key-results)
+- [Demo results (18-example set)](#demo-results-18-example-set)
 - [Quick start — demo in under 10 minutes](#quick-start--demo-in-under-10-minutes)
 - [Full evaluation](#full-evaluation-optional)
 - [Verifying metrics without re-running](#verifying-metrics-without-re-running-the-pipeline)
 - [Intent taxonomy](#intent-taxonomy)
 - [Project structure](#project-structure)
 - [Design philosophy](#design-philosophy)
-- [Known limitations](#known-limitations)
+- [Known limitations and honest tradeoffs](#known-limitations-and-honest-tradeoffs)
 - [What I'd do next](#what-id-do-next-with-one-more-week)
 - [Requirements](#requirements)
 
@@ -42,7 +43,7 @@ message ──► classify.py ──► retrieve.py (k=3) ──► generate.py 
 | **3. Generate** | Drafts a reply in AppleSupport's actual voice (empathetic opener → brief diagnostic question → DM handoff) | LLM call conditioned on the retrieved threads |
 | **4. Escalate** | Decides *auto-handle vs. human*, with a reason | Rule-based safety check **first**; LLM fallback (intent + confidence) if no rule fires |
 
-Each message is processed independently — there is deliberately no multi-turn conversation state (see [Known limitations](#known-limitations)).
+Each message is processed independently — there is deliberately no multi-turn conversation state (see [Known limitations and honest tradeoffs](#known-limitations-and-honest-tradeoffs)).
 
 ---
 
@@ -64,13 +65,15 @@ Full golden set (**197** hand-labelled messages). System metrics were computed o
 
 &gt; ⚠️ **Honest caveat:** baseline numbers use n=197 while system numbers use n=153, so the system-vs-baseline delta is directionally informative, not a strict apples-to-apples comparison. Treat baselines as a documented floor, not a precise delta.
 
+&gt; ⚠️ **Second confound:** the full-run predictions were generated across **two models**, not one — `gemini-3.6-flash` for the earlier portion of the batch run and `gemini-3.1-flash-lite` for the remainder after a mid-run free-tier daily quota switch. `predictions.jsonl` is therefore not a clean single-model evaluation. Disclosed in full in `report/REPORT.md` Section 6.
+
 ---
 
 ## Demo results (18-example set)
 
 Actual output from `python run_all.py --demo` (run on 2026-09-11, Gemini free tier, total runtime 3.7 min):
 
-| Task | Metric | Demo (n=14) | Demo baseline (n=18) | Full set (n=153) |
+| Task | Metric | Demo system (n=14) | Demo baseline (n=18) | Full set (n=153) |
 |---|---|---|---|---|
 | **Intent** | Accuracy | **0.929** | 0.556 (TF-IDF) | 0.856 |
 | **Intent** | Macro-F1 | **0.924** | 0.477 (TF-IDF) | 0.842 |
@@ -80,12 +83,12 @@ Actual output from `python run_all.py --demo` (run on 2026-09-11, Gemini free ti
 
 **Notes on this run:**
 - System metrics are on **14/18** items — 4 items hit the Gemini free-tier per-minute quota (15 req/min) and failed after retries. This is the same quota-exhaustion failure mode documented for the full run in `report/REPORT.md` Section 6.
-- Escalation recall **0.875** on the demo (7/8 true escalation cases caught, 1 false negative) — consistent with the full-set recall of 0.857, and again confirming the deliberate recall-over-precision tradeoff.
+- Escalation recall **0.875** on the demo (7/8 true escalation cases caught, 1 false negative) — consistent with the full-set recall of 0.857, confirming the deliberate recall-over-precision tradeoff.
 - The keyword-rule escalation baseline scores **0.000** on the demo (misses all 9 true escalation cases), matching the full-set baseline recall of 0.018 — escalation signals in this domain are contextual, not keyword-triggerable.
-- Intent accuracy on the demo (0.929) is higher than the full set (0.856), as expected on a small curated subset — the full-set number is the more meaningful one.
+- Demo intent accuracy (0.929) runs higher than the full set (0.856), as expected on a small curated subset — the full-set number is the more meaningful one.
 
-<details>
-<summary>Demo run — full terminal output</summary>
+&lt;details&gt;
+&lt;summary&gt;Demo run — condensed terminal output&lt;/summary&gt;
 
 ```
 ALL STEPS COMPLETE in 3.7 minutes  (DEMO (18 examples))
@@ -93,19 +96,7 @@ ALL STEPS COMPLETE in 3.7 minutes  (DEMO (18 examples))
 4/6  Metrics: system intent (14 matched examples)
 Accuracy:  0.929
 Macro-F1:  0.924
-
-Per-class report:
-                                     precision    recall  f1-score   support
-          Billing and Subscriptions       1.00      0.50      0.67         2
-          Data Recovery and Syncing       1.00      1.00      1.00         3
-Hardware Damage and Physical Repair       1.00      1.00      1.00         2
-       OS Performance and Stability       1.00      1.00      1.00         3
-           Product Specs and How-To       1.00      1.00      1.00         1
-       Security and Fraud Reporting       0.67      1.00      0.80         2
-       Store and Support Experience       1.00      1.00      1.00         1
-                           accuracy                           0.93        14
-                          macro avg       0.95      0.93      0.92        14
-                       weighted avg       0.95      0.93      0.92        14
+macro avg  precision 0.95  recall 0.93  f1-score 0.92
 
 5/6  Metrics: system escalation (14 matched examples)
 Precision: 0.636
@@ -124,7 +115,7 @@ F1:        0.000
 Confusion matrix: [[0 9], [0 9]]  (9 false negatives)
 ```
 
-</details>
+&lt;/details&gt;
 
 ---
 
@@ -159,6 +150,8 @@ python run_all.py --demo
 This runs the full pipeline (classify → retrieve + generate → escalate) plus the TF-IDF baseline on the 18-example demo set, and prints intent accuracy, macro-F1, and escalation precision / recall / F1.
 
 **Expected runtime:** 4–10 minutes on the Gemini free tier (depending on rate limits).
+
+**Note:** even the demo can lose a few items to the free-tier per-minute quota (15 req/min) on a heavily used key — the run still completes and scores the successful items, and the conclusions hold at slightly reduced N. Re-running picks up most failed items as the per-minute window resets.
 
 ---
 
@@ -253,18 +246,21 @@ Each golden-set item is labelled with `true_intent`, `escalate_human` (+ `escala
 - **Decision-support, not full autonomy.** AppleSupport's real-world pattern is funneling customers to DM for device-specific diagnosis. This system drafts and recommends — it does not autonomously send replies or file tickets.
 - **Escalation recall over precision.** Missing a genuine security/safety/exhaustion case is far worse than an unnecessary human review. This asymmetry drove threshold and prompt choices throughout.
 - **No fine-tuning.** With only 197 golden examples and a tight timeline, prompting + retrieval was the higher-leverage choice over fine-tuning on a tiny dataset.
-- **Honest limitations, documented.** Quota coverage gaps, baseline-N mismatches, taxonomy overloading, and dual-model confounds are disclosed in the report rather than hidden.
+- **Honest limitations, documented.** Quota coverage gaps, baseline-N mismatches, taxonomy overloading, and the dual-model confound are disclosed in the report rather than hidden.
 - **Validated judging.** LLM-as-judge reply scores were calibrated against human ratings before being used for failure analysis.
 
 ---
 
-## Known limitations
+## Known limitations and honest tradeoffs
 
-- **Free-tier Gemini limits** (15 req/min, 500 req/day) can interrupt long batch runs — 44/197 items in the full run failed on quota, which is why headline metrics are on 153 items. The demo path is designed to avoid this.
+- **Free-tier Gemini limits** (15 req/min, 500 req/day) can interrupt batch runs — 44/197 items in the full run failed on quota, which is why headline metrics are on 153 items, and 4/18 items in the demo run hit the per-minute cap. The demo path is designed to minimise but not eliminate this.
+- **Dual-model confound in the full run.** `predictions.jsonl` was generated across two models — `gemini-3.6-flash` (earlier portion) and `gemini-3.1-flash-lite` (remainder after a mid-run daily-quota switch). Reply style and judgment quality may vary within the same file; it is not a clean single-model evaluation. Full disclosure in `report/REPORT.md` Section 6.
+- **Baseline vs. system N mismatch.** Baselines were scored on all 197 items (no API calls to fail); the system on 153. The comparison establishes a documented floor, not a precise delta.
 - **Retrieval index is English-only** → non-English generation currently falls back to a template redirect instead of a substantive reply (classification still works across languages).
 - **No multi-turn conversation state** — each message is handled independently, so "I already tried that" context is invisible to the escalation layer.
 - **Rule-based safety trigger** currently matches self-harm language but not physical device-hazard language (e.g., electric-shock reports) — a known blind spot flagged as the highest-priority fix.
 - **"OS Performance and Stability"** is an overloaded taxonomy bucket that absorbs confusion from adjacent categories.
+- **Coverage-gap skew is unverified.** The 44 missing full-set items cluster toward the end of the batch (cumulative quota pressure); whether they're also skewed by category or escalation label hasn't been ruled out.
 
 See `report/REPORT.md` Sections 5–7 for the full failure analysis and discussion.
 
@@ -272,7 +268,7 @@ See `report/REPORT.md` Sections 5–7 for the full failure analysis and discussi
 
 ## What I'd do next with one more week
 
-1. **Close the coverage gap** — score all 197 items on a paid tier and check whether the 44 missing items shift any metric.
+1. **Close the coverage gap** — score all 197 items on a paid tier (single model, end-to-end) and check whether the 44 missing items shift any metric; this also resolves the dual-model confound.
 2. **Fix the safety-rule blind spot** — extend the pattern to physical/device-hazard language.
 3. **Rework the escalation prompt** to explicitly weight repeated-contact and exhaustion signals (the biggest lever on recall).
 4. **Add lightweight conversation-state tracking** (even just prior-contact counts per author) as an escalation feature.
