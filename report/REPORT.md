@@ -4,7 +4,7 @@
 
 This report covers the evaluation of an LLM-based support ticket triage pipeline against a hand-labeled golden set of 197 real support messages. The pipeline performs three tasks per message: **intent classification**, **retrieval-grounded reply generation**, and **escalation decisioning**. Each is evaluated independently against ground truth, and intent + escalation are additionally benchmarked against simple baselines.
 
-**System:** predictions were generated across two different models due to a mid-run free-tier daily quota switch — `gemini-3.6-flash` for the earlier portion of the batch run, `gemini-3.1-flash-lite` for the remainder after the quota forced a switch. This is a real confound disclosed in full in Section 6.
+**System:** predictions for this evaluation were generated end-to-end on a single model, `gemini-3.1-flash-lite` — this resolves the dual-model confound present in an earlier run of this pipeline (see Section 6 for the full history). **Golden set:** 197 messages, hand-labeled with true intent, escalation ground truth (with reasoning), and ideal-reply notes. **Baselines:** TF-IDF + Logistic Regression (intent), majority-class and rule-based heuristics (escalation)
 **Golden set:** 197 messages, hand-labeled with true intent, escalation ground truth (with reasoning), and ideal-reply notes
 **Baselines:** TF-IDF + Logistic Regression (intent), majority-class and rule-based heuristics (escalation)
 
@@ -64,74 +64,89 @@ This level of agreement supports using the judge's scores as the basis for the q
 
 ### 3.1 Intent classification
 
-**Note:** metrics computed on 153/197 items — see Section 6 for why.
+**Note:** metrics computed on 162/197 items — see Section 6 for why.
 
-| Metric | System | Baseline (TF-IDF) |
-|---|---|---|
-| Accuracy | **0.856** | *(see baseline run for comparison)* |
-| Macro-F1 | **0.842** | *(see baseline run for comparison)* |
+| Metric   | System    | Baseline (TF-IDF)                   |
+| -------- | --------- | ------------------------------------- |
+| Accuracy | **0.833** | *(see baseline run for comparison)* |
+| Macro-F1 | **0.824** | *(see baseline run for comparison)* |
 
 **Per-class report:**
 
-| Class | Precision | Recall | F1 | Support |
-|---|---|---|---|---|
-| Battery and Power Issues | 0.94 | 0.84 | 0.89 | 19 |
-| Billing and Subscriptions | 0.93 | 1.00 | 0.96 | 13 |
-| Connectivity and Call Failures | 0.83 | 0.83 | 0.83 | 6 |
-| Data Recovery and Syncing | 0.92 | 0.92 | 0.92 | 13 |
-| Hardware Damage and Physical Repair | 0.93 | 1.00 | 0.96 | 13 |
-| OS Performance and Stability | 0.92 | 0.77 | 0.84 | 47 |
-| Other | 0.40 | 0.67 | 0.50 | 6 |
-| Product Specs and How-To | 0.67 | 0.86 | 0.75 | 14 |
-| Security and Fraud Reporting | 0.93 | 1.00 | 0.97 | 14 |
-| Store and Support Experience | 0.86 | 0.75 | 0.80 | 8 |
-| **Weighted avg** | **0.88** | **0.86** | **0.86** | 153 |
+| Class                               | Precision | Recall   | F1       | Support |
+| ------------------------------------- | --------- | -------- | -------- | ------- |
+| Battery and Power Issues              | 0.93      | 0.81     | 0.87     | 16      |
+| Billing and Subscriptions             | 0.93      | 0.87     | 0.90     | 15      |
+| Connectivity and Call Failures        | 0.71      | 0.83     | 0.77     | 6       |
+| Data Recovery and Syncing             | 0.92      | 0.86     | 0.89     | 14      |
+| Hardware Damage and Physical Repair   | 0.94      | 1.00     | 0.97     | 15      |
+| OS Performance and Stability          | 0.89      | 0.76     | 0.82     | 45      |
+| Other                                  | 0.50      | 0.62     | 0.56     | 8       |
+| Product Specs and How-To              | 0.70      | 0.84     | 0.76     | 19      |
+| Security and Fraud Reporting          | 0.81      | 1.00     | 0.90     | 13      |
+| Store and Support Experience          | 0.82      | 0.82     | 0.82     | 11      |
+| **Weighted avg**                      | **0.85**  | **0.83** | **0.84** | 162     |
 
-Strongest performance: Security and Fraud Reporting, Hardware Damage, Billing — all F1 ≥ 0.96, consistent with these being relatively unambiguous, keyword-rich categories.
+Strongest performance: Hardware Damage (0.97 F1), Security and Fraud Reporting (0.90), Billing (0.90) — consistent with these being relatively unambiguous, keyword-rich categories.
 
-Weakest performance: "Other" (small support, catch-all category by design) and OS Performance and Stability, which shows the most confusion with adjacent categories (see Section 5.3).
+Weakest performance: "Other" (small support, catch-all category by design) and OS Performance and Stability, which continues to show the most confusion with adjacent categories (see Section 5.3, and the confusion matrix below).
+
+**Confusion matrix** (rows = true, cols = predicted; labels in taxonomy order above):
+
+```
+[13  0  0  0  1  0  1  1  0  0]
+[ 0 13  1  0  0  0  0  0  1  0]
+[ 0  0  5  0  0  1  0  0  0  0]
+[ 0  1  0 12  0  0  0  0  1  0]
+[ 0  0  0  0 15  0  0  0  0  0]
+[ 1  0  1  1  0 34  3  4  0  1]
+[ 0  0  0  0  0  2  5  0  0  1]
+[ 0  0  0  0  0  1  1 16  1  0]
+[ 0  0  0  0  0  0  0  0 13  0]
+[ 0  0  0  0  0  0  0  2  0  9]
+```
 
 ### 3.2 Escalation decision
 
-| Metric | Score |
-|---|---|
-| Precision | 0.450 |
-| Recall | **0.857** |
-| F1 | 0.590 |
+| Metric    | Score     |
+| --------- | --------- |
+| Precision | 0.476     |
+| Recall    | **0.851** |
+| F1        | 0.611     |
 
 **Confusion matrix** (rows = true, cols = predicted, labels = [True, False]):
 ```
            Pred: Escalate   Pred: No Escalate
-True: Esc.       36                6
-True: No Esc.    44               67
+True: Esc.       40                7
+True: No Esc.    44               71
 ```
 
-**Interpretation:** Recall was prioritized deliberately over precision. A false negative (a genuine fraud/safety case routed as routine) is a materially worse outcome than a false positive (an unnecessary human review of a routine message). The system catches 36 of 42 true escalation cases (85.7% recall) at the cost of over-flagging 44 non-escalation cases — a defensible tradeoff for a support triage system, though the 6 false negatives are analyzed in Section 5.1 since they represent the system's most costly failure mode.
+**Interpretation:** Recall was prioritized deliberately over precision, same as the original run. The system catches 40 of 47 true escalation cases (85.1% recall) at the cost of over-flagging 44 non-escalation cases — a defensible tradeoff for a support triage system, though the 7 false negatives are analyzed in Section 5.1 since they represent the system's most costly failure mode.
 
 ---
 
 ## 4. Comparison to baselines
 
-The TF-IDF baseline and rule-based escalation heuristics were run on the same golden set (`data/processed/baseline_predictions.jsonl`). One caveat before the numbers: the baseline was evaluated on all 197 items (no API calls involved, nothing to fail), while the system's numbers in Section 3 are on the 153 items that returned valid predictions (Section 6). The comparison below is therefore directionally informative but not a strict apples-to-apples N — treated here as establishing a documented floor rather than a precise delta.
+The TF-IDF baseline and rule-based escalation heuristics were run on the same golden set (`data/processed/baseline_predictions.jsonl`). One caveat before the numbers: the baseline was evaluated on all 197 items (no API calls involved, nothing to fail), while the system's numbers in Section 3 are on the 162 items that returned valid predictions (Section 6). The comparison below is therefore directionally informative but not a strict apples-to-apples N — treated here as establishing a documented floor rather than a precise delta.
 
 ### 4.1 Intent — TF-IDF baseline (n=197)
 
-| Metric | Baseline | System (n=153) |
-|---|---|---|
-| Accuracy | 0.574 | **0.856** |
-| Macro-F1 | 0.594 | **0.842** |
+| Metric   | Baseline | System (n=162) |
+| -------- | -------- | ---------------- |
+| Accuracy | 0.574    | **0.833**        |
+| Macro-F1 | 0.594    | **0.824**        |
 
-The baseline does reasonably on high-signal categories (Security/Fraud 0.88 F1, Billing 0.86 F1) but collapses on categories requiring more semantic understanding than keyword overlap — notably "OS Performance and Stability," where it achieves 0.95 precision but only 0.34 recall (the model rarely predicts this label, so when it does it's usually right, but it misses the large majority of true cases), and "Store and Support Experience" (0.41 F1). This is the expected shape of a bag-of-words model: strong on categories with distinctive vocabulary, weak on categories defined more by context and framing than specific keywords.
+The baseline does reasonably on high-signal categories (Security/Fraud 0.88 F1, Billing 0.86 F1) but collapses on categories requiring more semantic understanding than keyword overlap — notably "OS Performance and Stability," where it achieves 0.95 precision but only 0.34 recall, and "Store and Support Experience" (0.41 F1). This is the expected shape of a bag-of-words model: strong on categories with distinctive vocabulary, weak on categories defined more by context and framing than specific keywords.
 
 ### 4.2 Escalation — keyword-rule baseline (n=197)
 
-| Metric | Baseline (keyword-rule) | System (n=153) |
-|---|---|---|
-| Precision | 0.333 | 0.450 |
-| Recall | 0.018 | **0.857** |
-| F1 | 0.034 | **0.590** |
+| Metric    | Baseline (keyword-rule) | System (n=162) |
+| --------- | -------------------------- | ---------------- |
+| Precision | 0.333                       | 0.476            |
+| Recall    | 0.018                       | **0.851**        |
+| F1        | 0.034                       | **0.611**        |
 
-This is the starkest gap in the whole evaluation. The keyword-rule baseline catches essentially none of the true escalation cases (1 out of 55 — 0.018 recall) because escalation-worthy signals in this dataset are overwhelmingly contextual (prior failed attempts, frustration, implied urgency) rather than keyword-triggerable (a fixed list of "urgent," "emergency," etc. words). This result is itself informative: it confirms escalation in this domain is not a problem a rule layer can solve alone, which directly motivates the pipeline's two-layer rule + LLM-fallback design — and also underscores why failure mode 5.5 (the rule layer's blind spot) matters less in isolation than it would if the rule layer were the primary defense.
+This remains the starkest gap in the whole evaluation. The keyword-rule baseline catches essentially none of the true escalation cases (1 out of 55 — 0.018 recall) because escalation-worthy signals in this dataset are overwhelmingly contextual rather than keyword-triggerable. This confirms escalation in this domain is not a problem a rule layer can solve alone, which directly motivates the pipeline's two-layer rule + LLM-fallback design.
 
 ---
 
@@ -140,7 +155,7 @@ This is the starkest gap in the whole evaluation. The keyword-rule baseline catc
 Five failure modes identified from real golden-set examples, not hypothesized in the abstract.
 
 ### 5.1 Escalation logic misses "already exhausted troubleshooting" signals
-All 6 true escalation false negatives (`golden_0117`, `golden_0127`, `golden_0154`, `golden_0161`, `golden_0169`, `golden_0185`) share a pattern: the LLM escalation layer classifies the message as "standard troubleshooting" even when context clearly indicates otherwise — a prior device reset that didn't resolve the issue, a blocked self-service path, a status-check on a known unresolved bug, or explicit frustration/exhaustion language. This is not a rule-regex gap; it's the LLM judgment layer itself under-weighting persistence and exhaustion cues that a human reader picks up on immediately.
+All 7 true escalation false negatives share a pattern: the LLM escalation layer classifies the message as "standard troubleshooting" even when context clearly indicates otherwise — a prior device reset that didn't resolve the issue, a blocked self-service path, a status-check on a known unresolved bug, or explicit frustration/exhaustion language. This is not a rule-regex gap; it's the LLM judgment layer itself under-weighting persistence and exhaustion cues that a human reader picks up on immediately.
 
 **Implication:** the escalation prompt likely needs explicit instruction to weight repeated-contact and prior-attempt signals, not just message-level intent and confidence.
 
@@ -168,21 +183,17 @@ Discovered during golden-set labeling: the rule-based safety-escalation pattern 
 
 ## 6. What is misleading about my headline number?
 
-The honest short version: **the reported 85.6% intent accuracy and 85.7% escalation recall are computed on 153 of the 197 golden-set items (78% coverage), not all 197** — and separately, **the baseline comparison in Section 4 uses a different N (197) than the system it's compared against (153)**, making the delta between them directionally right but not a precise apples-to-apples measurement.
+The honest short version: **the reported 83.3% intent accuracy and 85.1% escalation recall are computed on 162 of the 197 golden-set items (82% coverage), not all 197** — and separately, **the baseline comparison in Section 4 uses a different N (197) than the system it's compared against (162)**, making the delta between them directionally right but not a precise apples-to-apples measurement.
 
-**Why the coverage gap exists:** 44 of 197 golden-set items (22%) failed during the batch evaluation run due to Gemini free-tier API quota exhaustion — not a pipeline defect, but a real constraint that shaped what got measured. The free tier enforces both a 15 requests/minute and a 500 requests/day cap per model. Each pipeline call issues 2-3 LLM calls (classify, generate, escalate), so a full 197-item batch run requires 400-600+ calls before retries — enough to exhaust the daily cap mid-run. A targeted resume pass, correctly identifying and re-attempting only the 44 failed items with proper per-minute rate-limit spacing, still failed identically, because the exhausted quota was the *daily*, not per-minute, limit — which spacing alone cannot fix.
+**Why the coverage gap exists:** 35 of 197 golden-set items (18%) failed during this batch evaluation run due to Gemini free-tier API quota exhaustion — the same constraint documented in an earlier run of this pipeline, which lost 44 items under the same failure mode. The free tier enforces both a 15 requests/minute and a 500 requests/day cap per model; a full 197-item batch requires 400-600+ calls before retries, enough to exhaust the daily cap mid-run.
 
-**Why this specific 22% matters, not just the percentage:** the 44 missing items are not randomly distributed — they're scattered across the golden set with a denser concentration in the final ~30 items (nearly every item from `golden_0187` onward failed), consistent with cumulative quota pressure building over the course of a long-running batch job, plus an earlier scattered cluster suggesting some items hit transient per-minute rate limits independently of the eventual daily cap. This wasn't rigorously checked for correlation with intent category or escalation label. A more careful next step would be confirming the missing 44 aren't skewed toward any particular category relative to the 153 that succeeded — plausible risk given the clustering, not yet ruled out.
+**Why this specific 18% matters, not just the percentage:** the 35 missing items again cluster toward the end of the batch — this run's raw log shows a dense run of consecutive failures from roughly item 188 through 197, the same tail region where the earlier run's 44 failures concentrated. That's now two independent runs showing the same clustering pattern, which is stronger evidence for "cumulative quota pressure" than a single run could offer, though it still hasn't been rigorously checked for correlation with intent category or escalation label — that remains an open question, flagged rather than resolved.
 
-**What I'd trust and what I wouldn't:** the *shape* of the results (intent classification working well, escalation recall prioritized successfully over precision, the five failure modes) is very likely to hold on the full 197 — the failure modes were pulled from real, verified examples, not statistical artifacts. What I would **not** over-trust is the third decimal place of any metric above — 0.856 accuracy should be read as "roughly mid-80s," not as a precise figure that would survive re-measurement on the full set.
+**A confound from the earlier run has been resolved, not just re-disclosed.** The original evaluation combined predictions from two different models (`gemini-3.6-flash` for part of the batch, `gemini-3.1-flash-lite` for the rest) after a mid-run quota switch forced a model change. This run was completed end-to-end on a single model, `gemini-3.1-flash-lite`, with no mid-run switch — so `predictions.jsonl` for this run is a clean single-model evaluation. The headline numbers moved only slightly from the earlier run (intent accuracy 85.6% → 83.3%, escalation F1 59.0% → 61.1%), which is itself informative: the dual-model confound in the original run apparently didn't distort the top-line metrics much, even though it was a real and correctly-disclosed risk at the time.
 
-**A second, separate confound: predictions came from two different models, not one.** Due to a mid-run free-tier daily quota exhaustion, the batch run was restarted partway through on a different model (`gemini-3.6-flash` for the earlier portion, `gemini-3.1-flash-lite` for the remainder after the switch). This means `predictions.jsonl` is not a clean single-model evaluation — reply style, and potentially classification/escalation judgment quality, may differ subtly between the two models' outputs within the same file. This was not controlled for or re-run as a single model end-to-end, given the time and API-quota constraints of the project. It's disclosed here rather than presented as a clean single-model result, since a reviewer re-deriving per-example conclusions should know this before reading too much into any single prediction's phrasing or judgment.
-
-For reference, a single-model re-run on the 18-item demo set (Appendix A) reproduced the escalation-recall pattern without this confound.
+**What I'd trust and what I wouldn't:** the *shape* of the results — intent classification working well, escalation recall prioritized successfully over precision, the same five failure modes recurring — held across two independent runs with different coverage and no shared model confound. That's a meaningfully stronger claim than either run could make alone. What I would still **not** over-trust is the third decimal place of any metric above; read 0.833 as "low-to-mid 80s," not as a figure that would survive exact re-measurement on the full 197.
 
 This is disclosed directly rather than omitted because reporting metrics as if all 197 items succeeded would misrepresent the evaluation's actual coverage. See the project README's "Known limitations and honest tradeoffs" section for the full debugging narrative and what would be done differently in a production setting (quota-aware batch scheduling, persistent job-queue backoff instead of in-process retries, and surfacing nested error objects as first-class signals in the eval tooling rather than requiring a manual dig to discover the coverage gap).
-
----
 
 ## 7. What I'd do next with one more week
 
@@ -201,7 +212,7 @@ In priority order, weighted toward what would most change whether this system is
 
 ## 8. Conclusion
 
-The pipeline performs well on intent classification (85.6% accuracy, 0.842 macro-F1, on the 153/197 items measured — see Section 6) and appropriately prioritizes recall over precision on escalation (85.7% recall), consistent with the asymmetric cost of missing a genuine escalation versus over-flagging a routine one. The LLM-judge scoring methodology is validated against human ratings at 90% within-1-point agreement, giving reasonable confidence in the qualitative failure analysis above.
+The pipeline performs well on intent classification (83.3% accuracy, 0.824 macro-F1, on the 162/197 items measured — see Section 6) and appropriately prioritizes recall over precision on escalation (85.1% recall), consistent with the asymmetric cost of missing a genuine escalation versus over-flagging a routine one. The LLM-judge scoring methodology is validated against human ratings at 90% within-1-point agreement, giving reasonable confidence in the qualitative failure analysis above.
 
 The five failure modes identified (Section 5) and the prioritized next-week plan (Section 7) point toward a system that is directionally solid — especially on the dimension that matters most for this brand's support model, catching cases that genuinely need a human — but with concrete, named gaps rather than an unqualified "it works."
 
