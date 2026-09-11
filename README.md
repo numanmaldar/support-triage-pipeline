@@ -49,23 +49,23 @@ Each message is processed independently — there is deliberately no multi-turn 
 
 ## Key results
 
-Full golden set (**197** hand-labelled messages). System metrics were computed on **153/197** items due to free-tier Gemini quota exhaustion mid-run — this is fully disclosed and analysed in `report/REPORT.md` (Section 6: *"What is misleading about my headline number?"*).
+Full golden set (**197** hand-labelled messages). System metrics were computed on **162/197** items due to free-tier Gemini quota exhaustion mid-run — this is fully disclosed and analysed in `report/REPORT.md` (Section 6: *"What is misleading about my headline number?"*).
 
-| Task | Metric | System | Baseline |
-|---|---|---|---|
-| **Intent** | Accuracy | **0.856** | 0.574 (TF-IDF + LogReg) |
-| **Intent** | Macro-F1 | **0.842** | 0.594 (TF-IDF + LogReg) |
-| **Escalation** | Precision | 0.450 | 0.333 (keyword-rule) |
-| **Escalation** | Recall | **0.857** | 0.018 (keyword-rule) |
-| **Escalation** | F1 | **0.590** | 0.034 (keyword-rule) |
+| Task           | Metric    | System    | Baseline                |
+| -------------- | --------- | --------- | ------------------------ |
+| **Intent**     | Accuracy  | **0.833** | 0.574 (TF-IDF + LogReg) |
+| **Intent**     | Macro-F1  | **0.824** | 0.594 (TF-IDF + LogReg) |
+| **Escalation** | Precision | 0.476     | 0.333 (keyword-rule)    |
+| **Escalation** | Recall    | **0.851** | 0.018 (keyword-rule)    |
+| **Escalation** | F1        | **0.611** | 0.034 (keyword-rule)    |
 
-**Reading the escalation numbers:** recall was deliberately prioritised over precision. Missing a genuine fraud/safety/exhaustion case (false negative) damages trust; an unnecessary human review of a routine message only costs a few minutes. The system catches **36 of 42** true escalation cases at the cost of over-flagging 44 routine ones.
+**Reading the escalation numbers:** recall was deliberately prioritised over precision. Missing a genuine fraud/safety/exhaustion case (false negative) damages trust; an unnecessary human review of a routine message only costs a few minutes. The system catches **40 of 47** true escalation cases at the cost of over-flagging 44 routine ones.
 
 **Reply-quality validation:** LLM-as-judge scores were calibrated against human raters on 30 samples — **90% agreement within 1 point** on a 5-point groundedness scale (63.3% exact match).
 
-&gt; ⚠️ **Honest caveat:** baseline numbers use n=197 while system numbers use n=153, so the system-vs-baseline delta is directionally informative, not a strict apples-to-apples comparison. Treat baselines as a documented floor, not a precise delta.
+> ⚠️ **Honest caveat:** baseline numbers use n=197 while system numbers use n=162, so the system-vs-baseline delta is directionally informative, not a strict apples-to-apples comparison. Treat baselines as a documented floor, not a precise delta.
 
-&gt; ⚠️ **Second confound:** the full-run predictions were generated across **two models**, not one — `gemini-3.6-flash` for the earlier portion of the batch run and `gemini-3.1-flash-lite` for the remainder after a mid-run free-tier daily quota switch. `predictions.jsonl` is therefore not a clean single-model evaluation. Disclosed in full in `report/REPORT.md` Section 6.
+> ⚠️ **Coverage note:** 35 of 197 golden-set items failed during the batch run on Gemini free-tier daily quota exhaustion — the same failure mode documented in the original run, just at slightly smaller scale (35 vs. the earlier run's 44). Full disclosure, including why this run no longer carries a dual-model confound, is in `report/REPORT.md` Section 6.
 
 ---
 
@@ -73,19 +73,20 @@ Full golden set (**197** hand-labelled messages). System metrics were computed o
 
 Actual output from `python run_all.py --demo` (run on 2026-09-11, Gemini free tier, total runtime 3.7 min):
 
-| Task | Metric | Demo system (n=14) | Demo baseline (n=18) | Full set (n=153) |
-|---|---|---|---|---|
-| **Intent** | Accuracy | **0.929** | 0.556 (TF-IDF) | 0.856 |
-| **Intent** | Macro-F1 | **0.924** | 0.477 (TF-IDF) | 0.842 |
-| **Escalation** | Precision | 0.636 | 0.000 (keyword-rule) | 0.450 |
-| **Escalation** | Recall | **0.875** | 0.000 (keyword-rule) | 0.857 |
-| **Escalation** | F1 | **0.737** | 0.000 (keyword-rule) | 0.590 |
+| Task           | Metric    | Demo system (n=14) | Demo baseline (n=18) | Full set (n=162) |
+| -------------- | --------- | ------------------- | ---------------------- | ------------------ |
+| **Intent**     | Accuracy  | **0.929**           | 0.556 (TF-IDF)         | 0.833               |
+| **Intent**     | Macro-F1  | **0.924**           | 0.477 (TF-IDF)         | 0.824               |
+| **Escalation** | Precision | 0.636               | 0.000 (keyword-rule)   | 0.476               |
+| **Escalation** | Recall    | **0.875**           | 0.000 (keyword-rule)   | 0.851               |
+| **Escalation** | F1        | **0.737**           | 0.000 (keyword-rule)   | 0.611               |
 
 **Notes on this run:**
+
 - System metrics are on **14/18** items — 4 items hit the Gemini free-tier per-minute quota (15 req/min) and failed after retries. This is the same quota-exhaustion failure mode documented for the full run in `report/REPORT.md` Section 6.
-- Escalation recall **0.875** on the demo (7/8 true escalation cases caught, 1 false negative) — consistent with the full-set recall of 0.857, confirming the deliberate recall-over-precision tradeoff.
+- Escalation recall **0.875** on the demo (7/8 true escalation cases caught, 1 false negative) — consistent with the full-set recall of 0.851, confirming the deliberate recall-over-precision tradeoff.
 - The keyword-rule escalation baseline scores **0.000** on the demo (misses all 9 true escalation cases), matching the full-set baseline recall of 0.018 — escalation signals in this domain are contextual, not keyword-triggerable.
-- Demo intent accuracy (0.929) runs higher than the full set (0.856), as expected on a small curated subset — the full-set number is the more meaningful one.
+- Demo intent accuracy (0.929) runs higher than the full set (0.833), as expected on a small curated subset — the full-set number is the more meaningful one.
 
 &lt;details&gt;
 &lt;summary&gt;Demo run — condensed terminal output&lt;/summary&gt;
@@ -208,7 +209,7 @@ python eval/metrics.py escalation \
 | 9 | Security and Fraud Reporting | Strongest class (F1 = 0.97) |
 | 10 | Store and Support Experience | |
 
-**Per-class performance** (system, n=153): strongest on Security and Fraud Reporting (0.97 F1), Hardware Damage (0.96), and Billing (0.96); weakest on *Other* (0.50) and *OS Performance and Stability* (0.84), the latter being a structural overlap magnet — nearly any bug can be plausibly framed as "since the last update."
+**Per-class performance** (system, n=162): strongest on Hardware Damage (0.97 F1), Security and Fraud Reporting (0.90), and Billing (0.90); weakest on *Other* (0.56) and *OS Performance and Stability* (0.82), the latter still the largest bucket at ~28% of matched golden items and still a structural overlap magnet — nearly any bug can be plausibly framed as "since the last update."
 
 ---
 
@@ -253,22 +254,21 @@ Each golden-set item is labelled with `true_intent`, `escalate_human` (+ `escala
 
 ## Known limitations and honest tradeoffs
 
-- **Free-tier Gemini limits** (15 req/min, 500 req/day) can interrupt batch runs — 44/197 items in the full run failed on quota, which is why headline metrics are on 153 items, and 4/18 items in the demo run hit the per-minute cap. The demo path is designed to minimise but not eliminate this.
-- **Dual-model confound in the full run.** `predictions.jsonl` was generated across two models — `gemini-3.6-flash` (earlier portion) and `gemini-3.1-flash-lite` (remainder after a mid-run daily-quota switch). Reply style and judgment quality may vary within the same file; it is not a clean single-model evaluation. Full disclosure in `report/REPORT.md` Section 6.
-- **Baseline vs. system N mismatch.** Baselines were scored on all 197 items (no API calls to fail); the system on 153. The comparison establishes a documented floor, not a precise delta.
+- **Free-tier Gemini limits** (15 req/min, 500 req/day) can interrupt batch runs — 35/197 items in the latest full run failed on quota, which is why headline metrics are on 162 items, and 4/18 items in the demo run hit the per-minute cap. The demo path is designed to minimise but not eliminate this.
+- **Baseline vs. system N mismatch.** Baselines were scored on all 197 items (no API calls to fail); the system on 162. The comparison establishes a documented floor, not a precise delta.
 - **Retrieval index is English-only** → non-English generation currently falls back to a template redirect instead of a substantive reply (classification still works across languages).
 - **No multi-turn conversation state** — each message is handled independently, so "I already tried that" context is invisible to the escalation layer.
 - **Rule-based safety trigger** currently matches self-harm language but not physical device-hazard language (e.g., electric-shock reports) — a known blind spot flagged as the highest-priority fix.
 - **"OS Performance and Stability"** is an overloaded taxonomy bucket that absorbs confusion from adjacent categories.
-- **Coverage-gap skew is unverified.** The 44 missing full-set items cluster toward the end of the batch (cumulative quota pressure); whether they're also skewed by category or escalation label hasn't been ruled out.
+- **Coverage-gap skew is unverified.** In both the original run (44 missing) and this run (35 missing), failures clustered toward the end of the batch — this run lost items in the same `~188-197` range as the earlier one, which is now two independent data points supporting the "cumulative quota pressure" hypothesis rather than random dropout. Still hasn't been rigorously checked for correlation with intent category or escalation label.
 
 See `report/REPORT.md` Sections 5–7 for the full failure analysis and discussion.
 
 ---
 
-## What I'd do next with one more week
+## What I'd do next 
 
-1. **Close the coverage gap** — score all 197 items on a paid tier (single model, end-to-end) and check whether the 44 missing items shift any metric; this also resolves the dual-model confound.
+1. **Close the remaining coverage gap** — score the missing 35/197 items on a paid tier and check whether they shift any metric. This is the last open item from the original plan; the dual-model confound flagged in the first run has already been resolved by re-running end-to-end on a single model (`gemini-3.1-flash-lite`) — see `report/REPORT.md` Section 6.
 2. **Fix the safety-rule blind spot** — extend the pattern to physical/device-hazard language.
 3. **Rework the escalation prompt** to explicitly weight repeated-contact and exhaustion signals (the biggest lever on recall).
 4. **Add lightweight conversation-state tracking** (even just prior-contact counts per author) as an escalation feature.
