@@ -1,0 +1,34 @@
+# --- Secrets ---
+.env
+*.key
+
+# --- Python ---
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# --- Raw / regenerable data (large, or derived from a public dataset) ---
+data/raw/
+data/processed/threads.jsonl
+data/processed/retrieval_index/
+
+# --- Regenerable model artifacts (rebuildable via eval/baselines.py train) ---
+data/processed/baseline_intent_model.pkl
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- LaTeX build artifacts (keep the .tex source, drop the build clutter) ---
+*.aux
+*.log
+*.out
+*.toc
+
+# NOTE: predictions.jsonl, baseline_predictions.jsonl, judge_scores.jsonl,
+# taxonomy_draft.json, taxonomy_final.json, brand_stats.csv, and
+# golden_set_ids.txt are intentionally NOT excluded — these are the
+# evidence files backing the report's results and should stay tracked
+# so reviewers can verify numbers without rerunning the pipeline.
+resume_log*.txt

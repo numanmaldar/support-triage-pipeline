@@ -1,0 +1,44 @@
+{
+  "intents": [
+    {
+      "name": "Battery and Power Issues",
+      "definition": "Reports of rapid battery drain, unexpected shutdowns, failure to charge, or overheating."
+    },
+    {
+      "name": "OS Performance and Stability",
+      "definition": "General lag, freezing, unexpected reboots, app crashes, or input/keyboard glitches, typically following a software update."
+    },
+    {
+      "name": "Connectivity and Call Failures",
+      "definition": "Wi-Fi dropping, Bluetooth pairing failures, cellular issues, or problems making/receiving calls."
+    },
+    {
+      "name": "Data Recovery and Syncing",
+      "definition": "Lost files, deleted photos/contacts, missing backups, or iCloud sync problems."
+    },
+    {
+      "name": "Billing and Subscriptions",
+      "definition": "Unauthorized charges, subscription cancellations, gift card usage, or App Store/Apple Music billing disputes."
+    },
+    {
+      "name": "Hardware Damage and Physical Repair",
+      "definition": "Physically damaged devices, liquid spills, component defects, or AppleCare/repair coverage questions."
+    },
+    {
+      "name": "Security and Fraud Reporting",
+      "definition": "Suspicious phishing emails, scam messages, or account security/verification concerns."
+    },
+    {
+      "name": "Product Specs and How-To",
+      "definition": "General usage questions, feature capability questions, compatibility questions, or policy questions (e.g. recycling)."
+    },
+    {
+      "name": "Store and Support Experience",
+      "definition": "Feedback or complaints about Genius Bar appointments, Apple Store visits, or phone support quality."
+    },
+    {
+      "name": "Other",
+      "definition": "Non-English messages, non-actionable venting/jokes, or messages that don't clearly fit any category above."
+    }
+  ]
+}

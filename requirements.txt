@@ -1,0 +1,6 @@
+pandas
+numpy
+tqdm
+google-genai
+sentence-transformers
+scikit-learn

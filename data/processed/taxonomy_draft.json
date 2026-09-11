@@ -1,0 +1,95 @@
+{
+  "intents": [
+    {
+      "name": "Battery and Power Issues",
+      "definition": "Customer messages reporting rapid battery drain, unexpected device power-offs, failure to charge, or overheating.",
+      "examples": [
+        "Dear . My battery is draining again. It was on 10% - I blinked and now at 1%.....\ud83e\udd14",
+        "Mon portable il charged plus du coup j\u2019ai appeler : -Bjr mon iPhone ne charge plus.",
+        "why is my iPhone 8 going dead within two hours???"
+      ]
+    },
+    {
+      "name": "Keyboard and Autocorrect Glitches",
+      "definition": "Customer messages specifically reporting text input bugs, character replacement errors, or symbol replacement glitches when typing.",
+      "examples": [
+        "can y\u2019all fix you\u2019re \u201cI\ufe0f\u201d situation.",
+        "text correction is not working for the letter I.",
+        "Why tf are all my \u201cI\u2019s\u201d turning into question marks?!"
+      ]
+    },
+    {
+      "name": "OS Performance and Stability",
+      "definition": "Customer messages regarding general system lag, freezing, unexpected reboots, or app crashes, often following a software update.",
+      "examples": [
+        "iOS 11 is definitely not for iPhone 6 so many bugs and phone lags so much. seems to be doing nothing for iPhone 6",
+        "it\u2019s by far the worst update you released! Most of the apps freeze on my phone. It\u2019s just frustrating \ud83d\ude24",
+        "my phone is constantly restarting since the last update, how can this be solved please ???"
+      ]
+    },
+    {
+      "name": "Connectivity and Call Failures",
+      "definition": "Customer messages detailing problems with Wi-Fi dropping, Bluetooth pairing, cellular connection, or making/receiving phone calls.",
+      "examples": [
+        "haven\u2019t been able to make a phone call since upgrading to iOS 11.0.3. Says call was made, but no connection. How do I fix??",
+        "Hi my iPad Pro 9,7\u201d is dropping my Wi-Fi connection, it\u2019s my only device doing it, any clues?",
+        "Since the newest update my MAC won't stay connected to my mouse & kb (bluetooth). Help !?!"
+      ]
+    },
+    {
+      "name": "Data Recovery and Syncing",
+      "definition": "Customer messages seeking help recovering lost files, deleted photos or contacts, missing backups, or fixing iCloud sync issues.",
+      "examples": [
+        "need your support to recover my iPhone without loosing my data.",
+        "Apple Music deleted a pile of my music and won\u2019t let me play it or redownload it?\ud83e\udd26\ud83c\udffb\u200d\u2642\ufe0f",
+        "my phone deleted all my contacts TWICE so I have no ones number"
+      ]
+    },
+    {
+      "name": "Billing and Subscriptions",
+      "definition": "Customer inquiries or disputes regarding unauthorized charges, subscription cancellations, gift card usage, or App Store/Apple Music fees.",
+      "examples": [
+        "Fuck you for still charging my card on an app subscription I cancelled 4 days ago",
+        "why was I charged 9.99 for a free Apple Music trial",
+        "I want to buy a Macbook and I see I get a \u00a3120 gift card. Can I use this gift card to buy the Macbook or do I have to use it on another item?"
+      ]
+    },
+    {
+      "name": "Hardware Damage and Physical Repair",
+      "definition": "Customer reports of physically damaged devices, liquid spills, component defects, or inquiries regarding physical repairs and AppleCare coverage.",
+      "examples": [
+        "Just cracked my watch screen just before boarding. Only under 3 weeks old. \ud83d\ude2d\ud83d\ude2d\ud83d\ude2d",
+        "my iPhone 6 fell into the sea, and I don't know what to do. I took it out, but I cannot open it",
+        "If I purchase Apple Care, will my repairs be free? Does Apple Care cover all repairs or only certain kinds."
+      ]
+    },
+    {
+      "name": "Security and Fraud Reporting",
+      "definition": "Customer inquiries regarding suspicious phishing emails, scam messages, potential security breaches, or account verification concerns.",
+      "examples": [
+        "received a suspicious email masked as Apple - could I forward to your spam team? Not sure what to do other than block",
+        "How often does this scam happen with apple users? Cause this is at least the fifth message I've received like this cc:",
+        "is this a scam?"
+      ]
+    },
+    {
+      "name": "Product Specifications and Features",
+      "definition": "General customer inquiries regarding device usage how-tos, feature capabilities, hardware compatibility, or recycling policies.",
+      "examples": [
+        "What is the best way to dispose of old charging cables? Will Apple store recycle them?",
+        "Is the iPhone X compatible with existing 7 Plus Lightning docks and power packs, including the ones made by Belkin?",
+        "hi just wondering is the Apple Watch series 1 waterproof thanks"
+      ]
+    },
+    {
+      "name": "Store and Support Experience",
+      "definition": "Customer feedback, complaints, or scheduling requests regarding Genius Bar appointments, Apple Store visits, or phone support experiences.",
+      "examples": [
+        "On the phone with your \"support\" team. I have been transferred 5x and hung up on twice. What is your problem!!!",
+        "Can someone tell me how to book an appointment with one of those geniuses at the Apple store. Thanks.",
+        "Missed a call regarding survey feedback from Apple Eldon Square. They refuse to answer my call from the number they left."
+      ]
+    }
+  ],
+  "notes": "A huge portion of this sample consists of complaints about a specific iOS 11 release bug where typing 'I' auto-corrected to a question mark symbol; while technically a software defect, its overwhelming volume justifies a distinct 'Keyboard and Autocorrect Glitches' category for specific handling/auto-replies. There are also several non-actionable or off-topic messages (e.g., jokes, general venting like 'wtf?', or personal updates like 'Now I can't stop sneezing') as well as non-English tweets (French, Spanish, German, Turkish) that would either fall into an 'Other / Unactionable' bucket or require language routing prior to intent classification."
+}
