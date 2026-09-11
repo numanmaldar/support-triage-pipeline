@@ -52,13 +52,15 @@ Each message is processed independently — there is deliberately no multi-turn 
 
 Full golden set (**197** hand-labelled messages). System metrics were computed on **162/197** items due to free-tier Gemini quota exhaustion mid-run — this is fully disclosed and analysed in `report/REPORT.md` (Section 6: *"What is misleading about my headline number?"*).
 
-| Task           | Metric    | System    | Baseline                |
-| -------------- | --------- | --------- | ------------------------ |
-| **Intent**     | Accuracy  | **0.833** | 0.574 (TF-IDF + LogReg) |
-| **Intent**     | Macro-F1  | **0.824** | 0.594 (TF-IDF + LogReg) |
-| **Escalation** | Precision | 0.476     | 0.333 (keyword-rule)    |
-| **Escalation** | Recall    | **0.851** | 0.018 (keyword-rule)    |
-| **Escalation** | F1        | **0.611** | 0.034 (keyword-rule)    |
+| Task           | Metric    | System (n=153) | Simple baseline    | Trivial baseline        |
+| -------------- | --------- | --------------- | ------------------- | ------------------------ |
+| **Intent**     | Accuracy  | **0.856**       | 0.574 (TF-IDF)      | 0.046 (majority-class)   |
+| **Intent**     | Macro-F1  | **0.842**       | 0.594 (TF-IDF)      | 0.009 (majority-class)   |
+| **Escalation** | Precision | 0.450           | 0.333 (keyword-rule)| 0.279 (always-escalate)  |
+| **Escalation** | Recall    | **0.857**       | 0.018 (keyword-rule)| 1.000 (always-escalate)  |
+| **Escalation** | F1        | **0.590**       | 0.034 (keyword-rule)| 0.437 (always-escalate)  |
+
+**Why the trivial baselines matter:** majority-class intent (predict "Other" for everything) scores 0.046 accuracy — confirming the taxonomy has real signal, not just 10 arbitrary labels a model could guess into. Always-escalate trivially hits 1.000 recall by flagging every message, at only 0.279 precision — this is the number that proves recall alone is an insufficient metric on its own; the system's 0.857 recall at 0.450 precision (vs. this 1.000/0.279 floor) shows it's doing real discrimination, not just mimicking "when in doubt, escalate."
 
 **Reading the escalation numbers:** recall was deliberately prioritised over precision. Missing a genuine fraud/safety/exhaustion case (false negative) damages trust; an unnecessary human review of a routine message only costs a few minutes. The system catches **40 of 47** true escalation cases at the cost of over-flagging 44 routine ones.
 
