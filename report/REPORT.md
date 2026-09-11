@@ -4,9 +4,29 @@
 
 This report covers the evaluation of an LLM-based support ticket triage pipeline against a hand-labeled golden set of 197 real support messages. The pipeline performs three tasks per message: **intent classification**, **retrieval-grounded reply generation**, and **escalation decisioning**. Each is evaluated independently against ground truth, and intent + escalation are additionally benchmarked against simple baselines.
 
-**System:** `gemini-3.1-flash-lite`, used for classification, generation, and escalation calls
+**System:** predictions were generated across two different models due to a mid-run free-tier daily quota switch — `gemini-3.6-flash` for the earlier portion of the batch run, `gemini-3.1-flash-lite` for the remainder after the quota forced a switch. This is a real confound disclosed in full in Section 6.
 **Golden set:** 197 messages, hand-labeled with true intent, escalation ground truth (with reasoning), and ideal-reply notes
 **Baselines:** TF-IDF + Logistic Regression (intent), majority-class and rule-based heuristics (escalation)
+
+Repo: [https://github.com/numanmaldar/support-triage-pipeline](https://github.com/numanmaldar/support-triage-pipeline)
+
+---
+
+## 1a. Problem framing
+
+**Brand:** AppleSupport (`@AppleSupport` on Twitter), selected from the Customer Support on Twitter dataset.
+
+**What "good" means for this brand:** AppleSupport's real-world pattern in the data is consistent — nearly every reply funnels the customer to DM regardless of issue type, because Apple's support model is built around device-specific diagnosis (serial numbers, iOS versions, account details) that can't safely happen in a public thread. Given that, "good" for this system means three things, in priority order:
+
+1. **Never let a message that needs human judgment (security, safety, a customer who's already tried everything and is escalating in tone) get auto-closed with generic reassurance.** This is why escalation recall was optimized over precision throughout this project — a missed escalation is the failure mode that actually damages trust; an unnecessary human review just costs a few minutes.
+2. **Classify intent well enough that a human agent picking up an escalated or auto-handled thread doesn't have to re-read the whole message to know what it's about.** Not perfect intent purity — the taxonomy has an intentionally broad "OS Performance and Stability" bucket (see failure mode 5.3) because that's genuinely how a large share of real Apple support traffic clusters.
+3. **Draft replies that sound like AppleSupport's actual voice and grounding style** (empathetic opener, brief diagnostic question, DM handoff) rather than an obviously AI-generated generic response — using retrieval over real historical AppleSupport replies specifically to anchor tone and structure, not just factual content.
+
+**What I chose not to build:**
+- **No multi-turn conversation state.** Each message is classified and replied to independently; the system doesn't track that this is the 3rd message in an ongoing thread with the same customer. This matters (failure mode 5.1 is partly about missing "I already tried that" context) but modeling full conversation state was out of scope given the time available — flagged explicitly rather than silently ignored.
+- **No sentiment/emotion scoring as a separate signal.** Frustration is inferred implicitly through the LLM escalation call, not measured as its own numeric feature. A dedicated sentiment classifier feeding into escalation is a plausible next step (see Section 8) but wasn't built here.
+- **No actual DM-sending or ticketing-system integration.** This is a decision-support system that drafts and recommends — it does not autonomously send replies or create tickets. Given Apple's own pattern is "diagnose in DM," and this system doesn't have DM access to the dataset's conversations, full autonomy wasn't a realistic or safe scope for this exercise.
+- **No fine-tuning.** Everything runs through prompted calls to `gemini-3.1-flash-lite` plus a lightweight retrieval layer, not a fine-tuned model. Given the golden set size (197 examples) and project timeline, prompting + retrieval was the higher-leverage choice over fine-tuning on a small number of examples.
 
 ---
 
@@ -146,25 +166,41 @@ Discovered during golden-set labeling: the rule-based safety-escalation pattern 
 
 ---
 
-## 6. Known limitations
+## 6. What is misleading about my headline number?
 
-**44 of 197 golden-set items (22%) are not reflected in the metrics above**, due to Gemini free-tier API quota exhaustion during the batch evaluation run — not a pipeline defect. All reported numbers in Sections 3 and 4 are computed on the 153 items that returned valid predictions.
+The honest short version: **the reported 85.6% intent accuracy and 85.7% escalation recall are computed on 153 of the 197 golden-set items (78% coverage), not all 197** — and separately, **the baseline comparison in Section 4 uses a different N (197) than the system it's compared against (153)**, making the delta between them directionally right but not a precise apples-to-apples measurement.
 
-Root cause: the free tier enforces both a 15 requests/minute and a 500 requests/day cap per model. Each pipeline call issues 2-3 LLM calls (classify, generate, escalate), so a full 197-item batch run requires 400-600+ calls before accounting for retries — enough to exhaust the daily cap mid-run. A targeted resume pass, correctly identifying and re-attempting only the 44 failed items with proper per-minute rate-limit spacing, still failed identically because the exhausted quota was the *daily*, not per-minute, limit — which spacing alone cannot resolve.
+**Why the coverage gap exists:** 44 of 197 golden-set items (22%) failed during the batch evaluation run due to Gemini free-tier API quota exhaustion — not a pipeline defect, but a real constraint that shaped what got measured. The free tier enforces both a 15 requests/minute and a 500 requests/day cap per model. Each pipeline call issues 2-3 LLM calls (classify, generate, escalate), so a full 197-item batch run requires 400-600+ calls before retries — enough to exhaust the daily cap mid-run. A targeted resume pass, correctly identifying and re-attempting only the 44 failed items with proper per-minute rate-limit spacing, still failed identically, because the exhausted quota was the *daily*, not per-minute, limit — which spacing alone cannot fix.
 
-This is disclosed directly rather than omitted because the alternative — reporting metrics as if all 197 items succeeded — would misrepresent the evaluation's actual coverage. See the project README's "Known limitations and honest tradeoffs" section for the full debugging narrative and what would be done differently in a production setting (quota-aware batch scheduling, persistent job-queue backoff instead of in-process retries, and surfacing nested error objects as first-class signals in the eval tooling rather than requiring a manual dig to discover the coverage gap).
+**Why this specific 22% matters, not just the percentage:** the 44 missing items are not randomly distributed — they're scattered across the golden set with a denser concentration in the final ~30 items (nearly every item from `golden_0187` onward failed), consistent with cumulative quota pressure building over the course of a long-running batch job, plus an earlier scattered cluster suggesting some items hit transient per-minute rate limits independently of the eventual daily cap. This wasn't rigorously checked for correlation with intent category or escalation label. A more careful next step would be confirming the missing 44 aren't skewed toward any particular category relative to the 153 that succeeded — plausible risk given the clustering, not yet ruled out.
+
+**What I'd trust and what I wouldn't:** the *shape* of the results (intent classification working well, escalation recall prioritized successfully over precision, the five failure modes) is very likely to hold on the full 197 — the failure modes were pulled from real, verified examples, not statistical artifacts. What I would **not** over-trust is the third decimal place of any metric above — 0.856 accuracy should be read as "roughly mid-80s," not as a precise figure that would survive re-measurement on the full set.
+
+**A second, separate confound: predictions came from two different models, not one.** Due to a mid-run free-tier daily quota exhaustion, the batch run was restarted partway through on a different model (`gemini-3.6-flash` for the earlier portion, `gemini-3.1-flash-lite` for the remainder after the switch). This means `predictions.jsonl` is not a clean single-model evaluation — reply style, and potentially classification/escalation judgment quality, may differ subtly between the two models' outputs within the same file. This was not controlled for or re-run as a single model end-to-end, given the time and API-quota constraints of the project. It's disclosed here rather than presented as a clean single-model result, since a reviewer re-deriving per-example conclusions should know this before reading too much into any single prediction's phrasing or judgment.
+
+This is disclosed directly rather than omitted because reporting metrics as if all 197 items succeeded would misrepresent the evaluation's actual coverage. See the project README's "Known limitations and honest tradeoffs" section for the full debugging narrative and what would be done differently in a production setting (quota-aware batch scheduling, persistent job-queue backoff instead of in-process retries, and surfacing nested error objects as first-class signals in the eval tooling rather than requiring a manual dig to discover the coverage gap).
 
 ---
 
-## 7. Conclusion
+## 7. What I'd do next with one more week
 
-The pipeline performs well on intent classification (85.6% accuracy, 0.842 macro-F1) and appropriately prioritizes recall over precision on escalation (85.7% recall), consistent with the asymmetric cost of missing a genuine escalation versus over-flagging a routine one. The LLM-judge scoring methodology is validated against human ratings at 90% within-1-point agreement, giving reasonable confidence in the qualitative failure analysis above.
+In priority order, weighted toward what would most change whether this system is trustworthy, not just what's easiest to build:
 
-The five identified failure modes point to concrete next steps, roughly in priority order:
-1. Close the safety-escalation rule gap (5.5) — highest severity, compounds with the LLM escalation gap
-2. Add exhaustion/persistence signal weighting to the escalation prompt (5.1)
-3. Extend retrieval coverage to non-English historical replies (5.2)
-4. Split or add disambiguation logic to the "OS Performance and Stability" category (5.3)
-5. Add an explicit no-action-needed classification path upstream of generation (5.4)
+1. **Close the coverage gap first.** Before anything else, get all 197 golden-set items scored on a paid tier or with proper multi-day scheduling, and check whether the 44 previously-missing items shift any metric meaningfully. This is boring but it's the honest prerequisite to trusting any other improvement measured against these numbers.
+2. **Fix the safety-escalation rule blind spot (5.5).** Highest-severity gap found — extend the rule pattern to cover physical/device-safety language, not just self-harm language, so a genuinely urgent case doesn't depend entirely on the LLM fallback layer.
+3. **Rework the escalation prompt to explicitly weight repeated-contact and exhaustion signals (5.1).** This is the single biggest lever on recall, which is the metric that matters most for this system's stated goal.
+4. **Add lightweight conversation-state tracking.** Even just "has this author_id contacted this brand before in the dataset, and how many times" as a feature passed into the escalation call would likely help catch several of the 5.1 false negatives without a full conversation-memory system.
+5. **Extend the retrieval index with non-English historical replies (5.2)**, and add a language-detection step so generation knows to actually attempt a substantive non-English reply rather than defaulting to the English redirect template.
+6. **Split or restructure "OS Performance and Stability" (5.3)** — likely into 2-3 more specific sub-categories, with explicit disambiguation criteria added to the classification prompt, and re-measure whether this improves both its own precision and reduces false attribution from other categories.
+7. **Add an explicit "no action needed" intent category** to address failure mode 5.4, so generation doesn't need to guess when to suppress its default DM-redirect template.
+8. **Build a small held-out test set (separate from the 197 used for iteration)** to check whether the fixes above actually generalize, rather than just re-fitting to the same golden set they were diagnosed from.
+
+---
+
+## 8. Conclusion
+
+The pipeline performs well on intent classification (85.6% accuracy, 0.842 macro-F1, on the 153/197 items measured — see Section 6) and appropriately prioritizes recall over precision on escalation (85.7% recall), consistent with the asymmetric cost of missing a genuine escalation versus over-flagging a routine one. The LLM-judge scoring methodology is validated against human ratings at 90% within-1-point agreement, giving reasonable confidence in the qualitative failure analysis above.
+
+The five failure modes identified (Section 5) and the prioritized next-week plan (Section 7) point toward a system that is directionally solid — especially on the dimension that matters most for this brand's support model, catching cases that genuinely need a human — but with concrete, named gaps rather than an unqualified "it works."
 
 Full design rationale for taxonomy, retrieval, and escalation threshold choices is in [`decision_log.md`](decision_log.md).
