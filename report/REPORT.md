@@ -4,9 +4,7 @@
 
 This report covers the evaluation of an LLM-based support ticket triage pipeline against a hand-labeled golden set of 197 real support messages. The pipeline performs three tasks per message: **intent classification**, **retrieval-grounded reply generation**, and **escalation decisioning**. Each is evaluated independently against ground truth, and intent + escalation are additionally benchmarked against simple baselines.
 
-**System:** predictions for this evaluation were generated end-to-end on a single model, `gemini-3.1-flash-lite` — this resolves the dual-model confound present in an earlier run of this pipeline (see Section 6 for the full history). **Golden set:** 197 messages, hand-labeled with true intent, escalation ground truth (with reasoning), and ideal-reply notes. **Baselines:** TF-IDF + Logistic Regression (intent), majority-class and rule-based heuristics (escalation)
-**Golden set:** 197 messages, hand-labeled with true intent, escalation ground truth (with reasoning), and ideal-reply notes
-**Baselines:** TF-IDF + Logistic Regression (intent), majority-class and rule-based heuristics (escalation)
+**System:** predictions for this evaluation were generated end-to-end on a single model, `gemini-3.1-flash-lite`. **Golden set:** 197 messages, hand-labeled with true intent, escalation ground truth (with reasoning), and ideal-reply notes. **Baselines:** TF-IDF + Logistic Regression (intent), majority-class and rule-based heuristics (escalation).
 
 Repo: [https://github.com/numanmaldar/support-triage-pipeline](https://github.com/numanmaldar/support-triage-pipeline)
 
@@ -121,7 +119,7 @@ True: Esc.       40                7
 True: No Esc.    44               71
 ```
 
-**Interpretation:** Recall was prioritized deliberately over precision, same as the original run. The system catches 40 of 47 true escalation cases (85.1% recall) at the cost of over-flagging 44 non-escalation cases — a defensible tradeoff for a support triage system, though the 7 false negatives are analyzed in Section 5.1 since they represent the system's most costly failure mode.
+**Interpretation:** Recall was prioritized deliberately over precision. The system catches 40 of 47 true escalation cases (85.1% recall) at the cost of over-flagging 44 non-escalation cases — a defensible tradeoff for a support triage system, though the 7 false negatives are analyzed in Section 5.1 since they represent the system's most costly failure mode.
 
 ---
 
@@ -165,7 +163,7 @@ The two lowest-scoring replies overall were non-English (French, Spanish) messag
 **Implication:** this is a retrieval-index coverage gap, not a classification or generation-capability gap — the underlying model can likely handle the language; the grounding context can't.
 
 ### 5.3 "OS Performance and Stability" is an overloaded taxonomy bucket
-This is both the largest category in the golden set (47/153 matched, ~31%) and the single most-confused-with-everything-else label — showing meaningful confusion with Product Specs, Other, Battery, Connectivity, and Data Recovery categories (see confusion matrix in the metrics output). Nearly any bug can be plausibly framed as "since the last update," making this bucket a structural overlap magnet.
+This is both the largest category in the golden set (45/162 matched, ~28%) and the single most-confused-with-everything-else label — showing meaningful confusion with Product Specs, Other, Battery, Connectivity, and Data Recovery categories (see confusion matrix in the metrics output). Nearly any bug can be plausibly framed as "since the last update," making this bucket a structural overlap magnet.
 
 **Implication:** this is a taxonomy design limitation more than a classifier failure — splitting this category further, or adding explicit disambiguation criteria to the classification prompt, would likely improve both this category's precision and reduce false "OS" attribution to other categories' recall.
 
@@ -185,13 +183,13 @@ Discovered during golden-set labeling: the rule-based safety-escalation pattern 
 
 The honest short version: **the reported 83.3% intent accuracy and 85.1% escalation recall are computed on 162 of the 197 golden-set items (82% coverage), not all 197** — and separately, **the baseline comparison in Section 4 uses a different N (197) than the system it's compared against (162)**, making the delta between them directionally right but not a precise apples-to-apples measurement.
 
-**Why the coverage gap exists:** 35 of 197 golden-set items (18%) failed during this batch evaluation run due to Gemini free-tier API quota exhaustion — the same constraint documented in an earlier run of this pipeline, which lost 44 items under the same failure mode. The free tier enforces both a 15 requests/minute and a 500 requests/day cap per model; a full 197-item batch requires 400-600+ calls before retries, enough to exhaust the daily cap mid-run.
+**Why the coverage gap exists:** 35 of 197 golden-set items (18%) failed during this batch evaluation run due to Gemini free-tier API quota exhaustion. The free tier enforces both a 15 requests/minute and a 500 requests/day cap per model; a full 197-item batch requires 400-600+ calls before retries, enough to exhaust the daily cap mid-run.
 
-**Why this specific 18% matters, not just the percentage:** the 35 missing items again cluster toward the end of the batch — this run's raw log shows a dense run of consecutive failures from roughly item 188 through 197, the same tail region where the earlier run's 44 failures concentrated. That's now two independent runs showing the same clustering pattern, which is stronger evidence for "cumulative quota pressure" than a single run could offer, though it still hasn't been rigorously checked for correlation with intent category or escalation label — that remains an open question, flagged rather than resolved.
+**Why this specific 18% matters, not just the percentage:** the 35 missing items cluster toward the end of the batch — the raw log shows a dense run of consecutive failures from roughly item 188 through 197, consistent with cumulative quota pressure rather than random dropout. This hasn't yet been rigorously checked for correlation with intent category or escalation label — that remains an open question, flagged rather than resolved.
 
-**A confound from the earlier run has been resolved, not just re-disclosed.** The original evaluation combined predictions from two different models (`gemini-3.6-flash` for part of the batch, `gemini-3.1-flash-lite` for the rest) after a mid-run quota switch forced a model change. This run was completed end-to-end on a single model, `gemini-3.1-flash-lite`, with no mid-run switch — so `predictions.jsonl` for this run is a clean single-model evaluation. The headline numbers moved only slightly from the earlier run (intent accuracy 85.6% → 83.3%, escalation F1 59.0% → 61.1%), which is itself informative: the dual-model confound in the original run apparently didn't distort the top-line metrics much, even though it was a real and correctly-disclosed risk at the time.
+**No model-mixing confound.** Predictions for this evaluation were generated end-to-end on a single model, `gemini-3.1-flash-lite`, with no mid-run model switch — so `predictions.jsonl` is a clean single-model evaluation.
 
-**What I'd trust and what I wouldn't:** the *shape* of the results — intent classification working well, escalation recall prioritized successfully over precision, the same five failure modes recurring — held across two independent runs with different coverage and no shared model confound. That's a meaningfully stronger claim than either run could make alone. What I would still **not** over-trust is the third decimal place of any metric above; read 0.833 as "low-to-mid 80s," not as a figure that would survive exact re-measurement on the full 197.
+**What I'd trust and what I wouldn't:** the *shape* of the results — intent classification working well, escalation recall prioritized successfully over precision, the five failure modes below — is consistent and well-supported by the per-class breakdown. What I would still **not** over-trust is the third decimal place of any metric above; read 0.833 as "low-to-mid 80s," not as a figure that would survive exact re-measurement on the full 197.
 
 This is disclosed directly rather than omitted because reporting metrics as if all 197 items succeeded would misrepresent the evaluation's actual coverage. See the project README's "Known limitations and honest tradeoffs" section for the full debugging narrative and what would be done differently in a production setting (quota-aware batch scheduling, persistent job-queue backoff instead of in-process retries, and surfacing nested error objects as first-class signals in the eval tooling rather than requiring a manual dig to discover the coverage gap).
 
@@ -199,7 +197,7 @@ This is disclosed directly rather than omitted because reporting metrics as if a
 
 In priority order, weighted toward what would most change whether this system is trustworthy, not just what's easiest to build:
 
-1. **Close the coverage gap first.** Before anything else, get all 197 golden-set items scored on a paid tier or with proper multi-day scheduling, and check whether the 44 previously-missing items shift any metric meaningfully. This is boring but it's the honest prerequisite to trusting any other improvement measured against these numbers.
+1. **Close the coverage gap first.** Before anything else, get all 197 golden-set items scored on a paid tier or with proper multi-day scheduling, and check whether the 35 previously-missing items shift any metric meaningfully. This is boring but it's the honest prerequisite to trusting any other improvement measured against these numbers.
 2. **Fix the safety-escalation rule blind spot (5.5).** Highest-severity gap found — extend the rule pattern to cover physical/device-safety language, not just self-harm language, so a genuinely urgent case doesn't depend entirely on the LLM fallback layer.
 3. **Rework the escalation prompt to explicitly weight repeated-contact and exhaustion signals (5.1).** This is the single biggest lever on recall, which is the metric that matters most for this system's stated goal.
 4. **Add lightweight conversation-state tracking.** Even just "has this author_id contacted this brand before in the dataset, and how many times" as a feature passed into the escalation call would likely help catch several of the 5.1 false negatives without a full conversation-memory system.
@@ -224,16 +222,16 @@ The reviewer-facing demo path (`python run_all.py --demo`) was re-run and verifi
 
 | Task | Metric | Demo system (n=14) | Demo baseline (n=18) | Full set (Section 3) |
 |---|---|---|---|---|
-| Intent | Accuracy | 0.929 | 0.556 (TF-IDF) | 0.856 |
-| Intent | Macro-F1 | 0.924 | 0.477 (TF-IDF) | 0.842 |
-| Escalation | Precision | 0.636 | 0.000 (keyword-rule) | 0.450 |
-| Escalation | Recall | 0.875 | 0.000 (keyword-rule) | 0.857 |
-| Escalation | F1 | 0.737 | 0.000 (keyword-rule) | 0.590 |
+| Intent | Accuracy | 0.929 | 0.556 (TF-IDF) | 0.833 |
+| Intent | Macro-F1 | 0.924 | 0.477 (TF-IDF) | 0.824 |
+| Escalation | Precision | 0.636 | 0.000 (keyword-rule) | 0.476 |
+| Escalation | Recall | 0.875 | 0.000 (keyword-rule) | 0.851 |
+| Escalation | F1 | 0.737 | 0.000 (keyword-rule) | 0.611 |
 
 Three things worth noting:
 
 1. **Coverage:** system metrics are on 14/18 items — 4 items hit the free-tier per-minute quota (15 req/min) and failed after retries, the same failure mode as the full run (Section 6), just at smaller scale.
-2. **Directional match:** demo escalation recall (0.875) and the keyword baseline scoring 0.000 (9/9 true escalation cases missed) reproduce the full-set patterns (0.857 and 0.018 respectively), supporting the README's claim that the demo path produces the same conclusions as the full evaluation. Demo intent accuracy (0.929) runs above the full set (0.856), as expected on a small curated subset — the full-set figure remains the meaningful one.
-3. **Single model:** unlike the full run, the demo was completed on a single model (`gemini-3.1-flash-lite`), so it carries no dual-model confound.
+2. **Directional match:** demo escalation recall (0.875) and the keyword baseline scoring 0.000 (9/9 true escalation cases missed) reproduce the full-set patterns (0.851 and 0.018 respectively), supporting the README's claim that the demo path produces the same conclusions as the full evaluation. Demo intent accuracy (0.929) runs above the full set (0.833), as expected on a small curated subset — the full-set figure remains the meaningful one.
+3. **Single model:** the demo was completed on a single model (`gemini-3.1-flash-lite`), so it carries no model-mixing confound.
 
 Full design rationale for taxonomy, retrieval, and escalation threshold choices is in [`decision_log.md`](decision_log.md).
