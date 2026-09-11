@@ -19,6 +19,7 @@ Given a single customer message, the pipeline **classifies intent** into a fixed
 - [Full evaluation](#full-evaluation-optional)
 - [Verifying metrics without re-running](#verifying-metrics-without-re-running-the-pipeline)
 - [Intent taxonomy](#intent-taxonomy)
+- [How the golden set was sampled and labelled](#how-the-golden-set-was-sampled-and-labelled)
 - [Project structure](#project-structure)
 - [Design philosophy](#design-philosophy)
 - [Known limitations and honest tradeoffs](#known-limitations-and-honest-tradeoffs)
@@ -213,6 +214,12 @@ python eval/metrics.py escalation \
 | 10 | Store and Support Experience | |
 
 **Per-class performance** (system, n=162): strongest on Hardware Damage (0.97 F1), Security and Fraud Reporting (0.90), and Billing (0.90); weakest on *Other* (0.56) and *OS Performance and Stability* (0.82), the latter still the largest bucket at ~28% of matched golden items and still a structural overlap magnet — nearly any bug can be plausibly framed as "since the last update."
+
+### How the golden set was sampled and labelled
+
+197 AppleSupport messages were sampled using keyword-bucket guesses as a stratification aid (e.g. `charg*` for battery/billing, safety-related terms, etc.) to ensure coverage across the eventual 10-category taxonomy rather than relying on random sampling, which would have under-represented rarer categories. Notably, roughly 50% of raw AppleSupport traffic didn't match any keyword bucket during this process — a real signal that a meaningful share of support messages are short, vague, or emotionally phrased in ways that resist simple keyword rules (see decision log #13), not a sampling failure.
+
+Each sampled message was then hand-labelled by the author against explicit criteria: `true_intent` (the correct taxonomy category), `escalate_human` + a written `escalation_reason_human` (would a human reviewer escalate this, and why — not just "does it look urgent"), and `ideal_reply_notes` (what a good response should contain). Labelling criteria and edge cases encountered (e.g. the `charg*` battery/billing ambiguity, non-English messages, pure venting with no actionable request) are documented in `report/decision_log.md`.
 
 ---
 
