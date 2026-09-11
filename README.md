@@ -66,6 +66,68 @@ Full golden set (**197** hand-labelled messages). System metrics were computed o
 
 ---
 
+## Demo results (18-example set)
+
+Actual output from `python run_all.py --demo` (run on 2026-09-11, Gemini free tier, total runtime 3.7 min):
+
+| Task | Metric | Demo (n=14) | Demo baseline (n=18) | Full set (n=153) |
+|---|---|---|---|---|
+| **Intent** | Accuracy | **0.929** | 0.556 (TF-IDF) | 0.856 |
+| **Intent** | Macro-F1 | **0.924** | 0.477 (TF-IDF) | 0.842 |
+| **Escalation** | Precision | 0.636 | 0.000 (keyword-rule) | 0.450 |
+| **Escalation** | Recall | **0.875** | 0.000 (keyword-rule) | 0.857 |
+| **Escalation** | F1 | **0.737** | 0.000 (keyword-rule) | 0.590 |
+
+**Notes on this run:**
+- System metrics are on **14/18** items — 4 items hit the Gemini free-tier per-minute quota (15 req/min) and failed after retries. This is the same quota-exhaustion failure mode documented for the full run in `report/REPORT.md` Section 6.
+- Escalation recall **0.875** on the demo (7/8 true escalation cases caught, 1 false negative) — consistent with the full-set recall of 0.857, and again confirming the deliberate recall-over-precision tradeoff.
+- The keyword-rule escalation baseline scores **0.000** on the demo (misses all 9 true escalation cases), matching the full-set baseline recall of 0.018 — escalation signals in this domain are contextual, not keyword-triggerable.
+- Intent accuracy on the demo (0.929) is higher than the full set (0.856), as expected on a small curated subset — the full-set number is the more meaningful one.
+
+<details>
+<summary>Demo run — full terminal output</summary>
+
+```
+ALL STEPS COMPLETE in 3.7 minutes  (DEMO (18 examples))
+
+4/6  Metrics: system intent (14 matched examples)
+Accuracy:  0.929
+Macro-F1:  0.924
+
+Per-class report:
+                                     precision    recall  f1-score   support
+          Billing and Subscriptions       1.00      0.50      0.67         2
+          Data Recovery and Syncing       1.00      1.00      1.00         3
+Hardware Damage and Physical Repair       1.00      1.00      1.00         2
+       OS Performance and Stability       1.00      1.00      1.00         3
+           Product Specs and How-To       1.00      1.00      1.00         1
+       Security and Fraud Reporting       0.67      1.00      0.80         2
+       Store and Support Experience       1.00      1.00      1.00         1
+                           accuracy                           0.93        14
+                          macro avg       0.95      0.93      0.92        14
+                       weighted avg       0.95      0.93      0.92        14
+
+5/6  Metrics: system escalation (14 matched examples)
+Precision: 0.636
+Recall:    0.875
+F1:        0.737
+Confusion matrix: [[7 1], [4 2]]  (1 false negative)
+
+6a  Metrics: baseline intent (18 matched examples)
+Accuracy:  0.556
+Macro-F1:  0.477
+
+6b  Metrics: baseline escalation (18 matched examples)
+Precision: 0.000
+Recall:    0.000
+F1:        0.000
+Confusion matrix: [[0 9], [0 9]]  (9 false negatives)
+```
+
+</details>
+
+---
+
 ## Quick start — demo in under 10 minutes
 
 The recommended path uses a curated **18-example demo set** that produces the same conclusions as the full evaluation, while staying comfortably inside Gemini free-tier rate limits.
