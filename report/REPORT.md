@@ -40,11 +40,8 @@ message → classify.py → retrieve.py (k=3) + generate.py → escalate.py → 
 - **escalate.py**: rule-based check first, LLM fallback using intent + classifier confidence if no rule fires
 
 ### 2.2 Golden set construction
-197 messages sampled and hand-labeled with:
-- `true_intent` — the correct category from the fixed taxonomy
-- `escalate_human` (bool) + `escalation_reason_human` — whether a human reviewer would escalate, and why
-- `ideal_reply_notes` — qualitative notes on what a good reply should contain
 
+Each sampled message was then hand-labelled by the author against explicit criteria: `true_intent` (the correct taxonomy category), `escalate_human` + a written `escalation_reason_human` (would a human reviewer escalate this, and why — not just "does it look urgent"), and `ideal_reply_notes` (what a good response should contain). Labelling criteria and edge cases encountered (e.g. the `charg*` battery/billing ambiguity, non-English messages, pure venting with no actionable request) are documented in `report/decision_log.md`.
 ### 2.3 Baselines
 - **Intent**: TF-IDF + Logistic Regression trained on keyword-bucket-guessed labels (not the hand labels — intentionally the "dumb, simple" comparison point), capped at 20,000 training examples, trained on the full thread corpus
 - **Escalation**: majority-class (`always_escalate` / `never_escalate`) and a keyword-rule heuristic, as reference points for how much the LLM layer adds over simple rules
@@ -145,6 +142,18 @@ The baseline does reasonably on high-signal categories (Security/Fraud 0.88 F1, 
 | F1        | 0.034                       | **0.611**        |
 
 This remains the starkest gap in the whole evaluation. The keyword-rule baseline catches essentially none of the true escalation cases (1 out of 55 — 0.018 recall) because escalation-worthy signals in this dataset are overwhelmingly contextual rather than keyword-triggerable. This confirms escalation in this domain is not a problem a rule layer can solve alone, which directly motivates the pipeline's two-layer rule + LLM-fallback design.
+
+### 4.3 Trivial baselines  
+
+| Task           | Metric    | System (n=153) | Simple baseline    | Trivial baseline        |
+| -------------- | --------- | --------------- | ------------------- | ------------------------ |
+| **Intent**     | Accuracy  | **0.856**       | 0.574 (TF-IDF)      | 0.046 (majority-class)   |
+| **Intent**     | Macro-F1  | **0.842**       | 0.594 (TF-IDF)      | 0.009 (majority-class)   |
+| **Escalation** | Precision | 0.450           | 0.333 (keyword-rule)| 0.279 (always-escalate)  |
+| **Escalation** | Recall    | **0.857**       | 0.018 (keyword-rule)| 1.000 (always-escalate)  |
+| **Escalation** | F1        | **0.590**       | 0.034 (keyword-rule)| 0.437 (always-escalate)  |
+
+**Why the trivial baselines matter:** majority-class intent (predict "Other" for everything) scores 0.046 accuracy — confirming the taxonomy has real signal, not just 10 arbitrary labels a model could guess into. Always-escalate trivially hits 1.000 recall by flagging every message, at only 0.279 precision — this is the number that proves recall alone is an insufficient metric on its own; the system's 0.857 recall at 0.450 precision (vs. this 1.000/0.279 floor) shows it's doing real discrimination, not just mimicking "when in doubt, escalate."
 
 ---
 
