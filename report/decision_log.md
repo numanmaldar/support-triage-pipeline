@@ -96,10 +96,3 @@
     short, vague, or emotionally-phrased in ways that resist simple
     keyword rules -- worth a mention in problem framing.
    
-14. Predictions were generated across TWO different Gemini models
-    (gemini-3.6-flash for the first ~N items, gemini-3.1-flash-lite for
-    the rest) due to free-tier daily quota limits hit mid-run. This is a
-    real inconsistency worth disclosing in the report -- reply quality/
-    style may differ slightly between the two models, which is a
-    legitimate confound when interpreting per-example results. Not
-    ideal, but disclosed honestly rather than hidden.
