@@ -1,6 +1,6 @@
 # Support Triage Pipeline
 
-&gt; LLM-based support triage agent for **AppleSupport** (@AppleSupport on Twitter), built on the *Customer Support on Twitter* dataset.
+> LLM-based support triage agent for **AppleSupport** (@AppleSupport on Twitter), built on the *Customer Support on Twitter* dataset.
 
 Given a single customer message, the pipeline **classifies intent** into a fixed 10-category taxonomy, **drafts a reply** grounded in real historical AppleSupport responses via retrieval, and **decides** whether to auto-handle the message or escalate it to a human — with an explicit reason.
 
@@ -24,6 +24,7 @@ Given a single customer message, the pipeline **classifies intent** into a fixed
 - [Known limitations and honest tradeoffs](#known-limitations-and-honest-tradeoffs)
 - [What I'd do next](#what-id-do-next-with-one-more-week)
 - [Requirements](#requirements)
+- [Acknowledgements](#acknowledgements)
 
 ---
 
@@ -65,7 +66,7 @@ Full golden set (**197** hand-labelled messages). System metrics were computed o
 
 > ⚠️ **Honest caveat:** baseline numbers use n=197 while system numbers use n=162, so the system-vs-baseline delta is directionally informative, not a strict apples-to-apples comparison. Treat baselines as a documented floor, not a precise delta.
 
-> ⚠️ **Coverage note:** 35 of 197 golden-set items failed during the batch run on Gemini free-tier daily quota exhaustion — the same failure mode documented in the original run, just at slightly smaller scale (35 vs. the earlier run's 44). Full disclosure, including why this run no longer carries a dual-model confound, is in `report/REPORT.md` Section 6.
+> ⚠️ **Coverage note:** 35 of 197 golden-set items failed during the batch run on Gemini free-tier daily quota exhaustion. Full disclosure is in `report/REPORT.md` Section 6.
 
 ---
 
@@ -88,8 +89,8 @@ Actual output from `python run_all.py --demo` (run on 2026-09-11, Gemini free ti
 - The keyword-rule escalation baseline scores **0.000** on the demo (misses all 9 true escalation cases), matching the full-set baseline recall of 0.018 — escalation signals in this domain are contextual, not keyword-triggerable.
 - Demo intent accuracy (0.929) runs higher than the full set (0.833), as expected on a small curated subset — the full-set number is the more meaningful one.
 
-&lt;details&gt;
-&lt;summary&gt;Demo run — condensed terminal output&lt;/summary&gt;
+<details>
+<summary>Demo run — condensed terminal output</summary>
 
 ```
 ALL STEPS COMPLETE in 3.7 minutes  (DEMO (18 examples))
@@ -116,7 +117,7 @@ F1:        0.000
 Confusion matrix: [[0 9], [0 9]]  (9 false negatives)
 ```
 
-&lt;/details&gt;
+</details>
 
 ---
 
@@ -202,11 +203,11 @@ python eval/metrics.py escalation \
 | 2 | Billing and Subscriptions | |
 | 3 | Connectivity and Call Failures | |
 | 4 | Data Recovery and Syncing | |
-| 5 | Hardware Damage and Physical Repair | |
-| 6 | OS Performance and Stability | Largest bucket — intentionally broad; ~31% of matched golden items |
+| 5 | Hardware Damage and Physical Repair | Strongest class (F1 = 0.97) |
+| 6 | OS Performance and Stability | Largest bucket — intentionally broad; ~28% of matched golden items |
 | 7 | Other | Catch-all by design; small support, lower scores expected |
 | 8 | Product Specs and How-To | |
-| 9 | Security and Fraud Reporting | Strongest class (F1 = 0.97) |
+| 9 | Security and Fraud Reporting | Strong class (F1 = 0.90) |
 | 10 | Store and Support Experience | |
 
 **Per-class performance** (system, n=162): strongest on Hardware Damage (0.97 F1), Security and Fraud Reporting (0.90), and Billing (0.90); weakest on *Other* (0.56) and *OS Performance and Stability* (0.82), the latter still the largest bucket at ~28% of matched golden items and still a structural overlap magnet — nearly any bug can be plausibly framed as "since the last update."
@@ -247,7 +248,7 @@ Each golden-set item is labelled with `true_intent`, `escalate_human` (+ `escala
 - **Decision-support, not full autonomy.** AppleSupport's real-world pattern is funneling customers to DM for device-specific diagnosis. This system drafts and recommends — it does not autonomously send replies or file tickets.
 - **Escalation recall over precision.** Missing a genuine security/safety/exhaustion case is far worse than an unnecessary human review. This asymmetry drove threshold and prompt choices throughout.
 - **No fine-tuning.** With only 197 golden examples and a tight timeline, prompting + retrieval was the higher-leverage choice over fine-tuning on a tiny dataset.
-- **Honest limitations, documented.** Quota coverage gaps, baseline-N mismatches, taxonomy overloading, and the dual-model confound are disclosed in the report rather than hidden.
+- **Honest limitations, documented.** Quota coverage gaps, baseline-N mismatches, and taxonomy overloading are disclosed in the report rather than hidden.
 - **Validated judging.** LLM-as-judge reply scores were calibrated against human ratings before being used for failure analysis.
 
 ---
@@ -260,15 +261,15 @@ Each golden-set item is labelled with `true_intent`, `escalate_human` (+ `escala
 - **No multi-turn conversation state** — each message is handled independently, so "I already tried that" context is invisible to the escalation layer.
 - **Rule-based safety trigger** currently matches self-harm language but not physical device-hazard language (e.g., electric-shock reports) — a known blind spot flagged as the highest-priority fix.
 - **"OS Performance and Stability"** is an overloaded taxonomy bucket that absorbs confusion from adjacent categories.
-- **Coverage-gap skew is unverified.** In both the original run (44 missing) and this run (35 missing), failures clustered toward the end of the batch — this run lost items in the same `~188-197` range as the earlier one, which is now two independent data points supporting the "cumulative quota pressure" hypothesis rather than random dropout. Still hasn't been rigorously checked for correlation with intent category or escalation label.
+- **Coverage-gap skew is unverified.** The 35 missing items cluster toward the end of the batch (`~188-197`), consistent with cumulative quota pressure rather than random dropout — though this hasn't been rigorously checked for correlation with intent category or escalation label.
 
 See `report/REPORT.md` Sections 5–7 for the full failure analysis and discussion.
 
 ---
 
-## What I'd do next 
+## What I'd do next with one more week
 
-1. **Close the remaining coverage gap** — score the missing 35/197 items on a paid tier and check whether they shift any metric. This is the last open item from the original plan; the dual-model confound flagged in the first run has already been resolved by re-running end-to-end on a single model (`gemini-3.1-flash-lite`) — see `report/REPORT.md` Section 6.
+1. **Close the remaining coverage gap** — score the missing 35/197 items on a paid tier and check whether they shift any metric. See `report/REPORT.md` Section 6 for the full coverage-gap disclosure.
 2. **Fix the safety-rule blind spot** — extend the pattern to physical/device-hazard language.
 3. **Rework the escalation prompt** to explicitly weight repeated-contact and exhaustion signals (the biggest lever on recall).
 4. **Add lightweight conversation-state tracking** (even just prior-contact counts per author) as an escalation feature.
@@ -284,5 +285,22 @@ See `report/REPORT.md` Sections 5–7 for the full failure analysis and discussi
 - Python 3.10+
 - A Gemini API key (`GEMINI_API_KEY`) — free tier works for the demo path
 - See `requirements.txt` for packages (includes `sentence-transformers` for retrieval)
+
+---
+
+## Acknowledgements
+
+This project was built with the assistance of AI coding tools:
+
+- **Gemini** (`gemini-3.1-flash-lite`) — powers the runtime pipeline: intent classification, retrieval-grounded reply generation, and the LLM fallback layer in the escalation decision. It also served as the LLM-as-judge for reply-quality scoring during evaluation.
+- **Claude (Anthropic)** — used as an AI coding assistant during development, for help with code structuring, debugging, documentation drafting, report review, and internal consistency checks on the evaluation write-up.
+
+Data and models used:
+
+- **Customer Support on Twitter** dataset (Kaggle, `thoughtvector/customer-support-on-twitter`) — source of all conversation data and historical AppleSupport replies.
+- **`all-MiniLM-L6-v2`** (Sentence-Transformers) — sentence embeddings for the retrieval index.
+- **scikit-learn** — TF-IDF vectoriser and Logistic Regression for the intent baseline.
+
+Any other borrowed code or ideas are noted in the relevant source files.
 
 ---
