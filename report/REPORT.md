@@ -92,7 +92,26 @@ True: No Esc.    44               67
 
 ## 4. Comparison to baselines
 
-The TF-IDF baseline and rule-based escalation heuristics were run on the same golden set for reference (`data/processed/baseline_predictions.jsonl`). The LLM-based system substantially outperforms the majority-class and keyword-only baselines on both tasks, as expected — the value of this comparison is less "does the LLM beat a trivial baseline" and more establishing a documented floor: any future iteration on this pipeline should be measured against both the baseline *and* the current LLM system's numbers above, not just against "seems better."
+The TF-IDF baseline and rule-based escalation heuristics were run on the same golden set (`data/processed/baseline_predictions.jsonl`). One caveat before the numbers: the baseline was evaluated on all 197 items (no API calls involved, nothing to fail), while the system's numbers in Section 3 are on the 153 items that returned valid predictions (Section 6). The comparison below is therefore directionally informative but not a strict apples-to-apples N — treated here as establishing a documented floor rather than a precise delta.
+
+### 4.1 Intent — TF-IDF baseline (n=197)
+
+| Metric | Baseline | System (n=153) |
+|---|---|---|
+| Accuracy | 0.574 | **0.856** |
+| Macro-F1 | 0.594 | **0.842** |
+
+The baseline does reasonably on high-signal categories (Security/Fraud 0.88 F1, Billing 0.86 F1) but collapses on categories requiring more semantic understanding than keyword overlap — notably "OS Performance and Stability," where it achieves 0.95 precision but only 0.34 recall (the model rarely predicts this label, so when it does it's usually right, but it misses the large majority of true cases), and "Store and Support Experience" (0.41 F1). This is the expected shape of a bag-of-words model: strong on categories with distinctive vocabulary, weak on categories defined more by context and framing than specific keywords.
+
+### 4.2 Escalation — keyword-rule baseline (n=197)
+
+| Metric | Baseline (keyword-rule) | System (n=153) |
+|---|---|---|
+| Precision | 0.333 | 0.450 |
+| Recall | 0.018 | **0.857** |
+| F1 | 0.034 | **0.590** |
+
+This is the starkest gap in the whole evaluation. The keyword-rule baseline catches essentially none of the true escalation cases (1 out of 55 — 0.018 recall) because escalation-worthy signals in this dataset are overwhelmingly contextual (prior failed attempts, frustration, implied urgency) rather than keyword-triggerable (a fixed list of "urgent," "emergency," etc. words). This result is itself informative: it confirms escalation in this domain is not a problem a rule layer can solve alone, which directly motivates the pipeline's two-layer rule + LLM-fallback design — and also underscores why failure mode 5.5 (the rule layer's blind spot) matters less in isolation than it would if the rule layer were the primary defense.
 
 ---
 
@@ -101,7 +120,7 @@ The TF-IDF baseline and rule-based escalation heuristics were run on the same go
 Five failure modes identified from real golden-set examples, not hypothesized in the abstract.
 
 ### 5.1 Escalation logic misses "already exhausted troubleshooting" signals
-All 8 escalation false negatives share a pattern: the LLM escalation layer classifies the message as "standard troubleshooting" even when context clearly indicates otherwise — a prior device reset that didn't resolve the issue, a blocked self-service path, a status-check on a known unresolved bug, or explicit frustration/exhaustion language. This is not a rule-regex gap; it's the LLM judgment layer itself under-weighting persistence and exhaustion cues that a human reader picks up on immediately.
+All 6 true escalation false negatives (`golden_0117`, `golden_0127`, `golden_0154`, `golden_0161`, `golden_0169`, `golden_0185`) share a pattern: the LLM escalation layer classifies the message as "standard troubleshooting" even when context clearly indicates otherwise — a prior device reset that didn't resolve the issue, a blocked self-service path, a status-check on a known unresolved bug, or explicit frustration/exhaustion language. This is not a rule-regex gap; it's the LLM judgment layer itself under-weighting persistence and exhaustion cues that a human reader picks up on immediately.
 
 **Implication:** the escalation prompt likely needs explicit instruction to weight repeated-contact and prior-attempt signals, not just message-level intent and confidence.
 
