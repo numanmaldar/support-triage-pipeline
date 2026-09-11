@@ -178,6 +178,8 @@ The honest short version: **the reported 85.6% intent accuracy and 85.7% escalat
 
 **A second, separate confound: predictions came from two different models, not one.** Due to a mid-run free-tier daily quota exhaustion, the batch run was restarted partway through on a different model (`gemini-3.6-flash` for the earlier portion, `gemini-3.1-flash-lite` for the remainder after the switch). This means `predictions.jsonl` is not a clean single-model evaluation — reply style, and potentially classification/escalation judgment quality, may differ subtly between the two models' outputs within the same file. This was not controlled for or re-run as a single model end-to-end, given the time and API-quota constraints of the project. It's disclosed here rather than presented as a clean single-model result, since a reviewer re-deriving per-example conclusions should know this before reading too much into any single prediction's phrasing or judgment.
 
+For reference, a single-model re-run on the 18-item demo set (Appendix A) reproduced the escalation-recall pattern without this confound.
+
 This is disclosed directly rather than omitted because reporting metrics as if all 197 items succeeded would misrepresent the evaluation's actual coverage. See the project README's "Known limitations and honest tradeoffs" section for the full debugging narrative and what would be done differently in a production setting (quota-aware batch scheduling, persistent job-queue backoff instead of in-process retries, and surfacing nested error objects as first-class signals in the eval tooling rather than requiring a manual dig to discover the coverage gap).
 
 ---
@@ -202,5 +204,25 @@ In priority order, weighted toward what would most change whether this system is
 The pipeline performs well on intent classification (85.6% accuracy, 0.842 macro-F1, on the 153/197 items measured — see Section 6) and appropriately prioritizes recall over precision on escalation (85.7% recall), consistent with the asymmetric cost of missing a genuine escalation versus over-flagging a routine one. The LLM-judge scoring methodology is validated against human ratings at 90% within-1-point agreement, giving reasonable confidence in the qualitative failure analysis above.
 
 The five failure modes identified (Section 5) and the prioritized next-week plan (Section 7) point toward a system that is directionally solid — especially on the dimension that matters most for this brand's support model, catching cases that genuinely need a human — but with concrete, named gaps rather than an unqualified "it works."
+
+---
+
+## Appendix A — Demo run verification (18-example set)
+
+The reviewer-facing demo path (`python run_all.py --demo`) was re-run and verified on 2026-09-11 (Gemini free tier, `gemini-3.1-flash-lite`, total runtime 3.7 min). Results:
+
+| Task | Metric | Demo system (n=14) | Demo baseline (n=18) | Full set (Section 3) |
+|---|---|---|---|---|
+| Intent | Accuracy | 0.929 | 0.556 (TF-IDF) | 0.856 |
+| Intent | Macro-F1 | 0.924 | 0.477 (TF-IDF) | 0.842 |
+| Escalation | Precision | 0.636 | 0.000 (keyword-rule) | 0.450 |
+| Escalation | Recall | 0.875 | 0.000 (keyword-rule) | 0.857 |
+| Escalation | F1 | 0.737 | 0.000 (keyword-rule) | 0.590 |
+
+Three things worth noting:
+
+1. **Coverage:** system metrics are on 14/18 items — 4 items hit the free-tier per-minute quota (15 req/min) and failed after retries, the same failure mode as the full run (Section 6), just at smaller scale.
+2. **Directional match:** demo escalation recall (0.875) and the keyword baseline scoring 0.000 (9/9 true escalation cases missed) reproduce the full-set patterns (0.857 and 0.018 respectively), supporting the README's claim that the demo path produces the same conclusions as the full evaluation. Demo intent accuracy (0.929) runs above the full set (0.856), as expected on a small curated subset — the full-set figure remains the meaningful one.
+3. **Single model:** unlike the full run, the demo was completed on a single model (`gemini-3.1-flash-lite`), so it carries no dual-model confound.
 
 Full design rationale for taxonomy, retrieval, and escalation threshold choices is in [`decision_log.md`](decision_log.md).
